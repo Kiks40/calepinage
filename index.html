@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calepinage - Simulateur</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="app-container">
+        <!-- Sidebar Controls -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h2>📐 Calepinage</h2>
+                <p>Dessinez votre pièce et optimisez vos coupes</p>
+            </div>
+
+            <!-- Mode Selector -->
+            <div class="control-group">
+                <h3>Outils</h3>
+                <div class="button-group">
+                    <button id="btnDraw" class="active" title="Dessiner les murs">✏️ Dessiner</button>
+                    <button id="btnEdit" title="Déplacer le point de départ du carrelage">✥ Calepinage</button>
+                </div>
+                <button id="btnClear" class="danger">🗑️ Tout effacer</button>
+            </div>
+
+            <!-- Precise Input -->
+            <div class="control-group" id="preciseInputGroup" style="display: none;">
+                <h3>Saisie exacte du mur</h3>
+                <div class="input-grid">
+                    <div style="grid-column: span 2;">
+                        <label for="wallLength">Longueur (cm)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="number" id="wallLength" placeholder="ex: 300" step="1"
+                                title="Pointez la souris dans la direction voulue puis validez">
+                            <button id="btnApplyWall" style="flex-shrink: 0; padding: 8px 15px;">Ajouter</button>
+                        </div>
+                        <small style="color: var(--text-muted); margin-top: 8px; display: block; line-height: 1.3;">
+                            1. Pointez la souris vers la direction du mur.<br>
+                            2. Entrez la longueur et validez.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tile Settings -->
+            <div class="control-group">
+                <h3>Carrelage</h3>
+                <div class="input-grid">
+                    <div style="grid-column: span 2;">
+                        <label for="tileShape">Forme</label>
+                        <select id="tileShape"
+                            style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: white; font-family: 'Outfit', sans-serif;">
+                            <option value="rect">Rectangle</option>
+                            <option value="hexa">Hexagone</option>
+                            <option value="octo">Octogone (+ Cabochons)</option>
+							<option value="fish">Écaille</option> ```
+                        </select>
+                    </div>
+                    <div>
+                        <label for="tileW">Largeur (cm)</label>
+                        <input type="number" id="tileW" value="60" min="5" step="5">
+                    </div>
+                    <div>
+                        <label for="tileH">Hauteur (cm)</label>
+                        <input type="number" id="tileH" value="60" min="5" step="5">
+                    </div>
+                    <div>
+                        <label for="joint">Joint (mm)</label>
+                        <input type="number" id="joint" value="3" min="0" step="0.5">
+                    </div>
+                    <div>
+                        <label for="angle">Angle (°)</label>
+                        <input type="number" id="angle" value="0" min="-180" max="180" step="5">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tiling Offset (only active in edit mode, managed via JS if needed) -->
+            <div class="control-group">
+                <h3>Décalage départ (cm)</h3>
+                <div class="input-grid">
+                    <div>
+                        <label for="offsetX">Axe X</label>
+                        <input type="number" id="offsetX" value="0">
+                    </div>
+                    <div>
+                        <label for="offsetY">Axe Y</label>
+                        <input type="number" id="offsetY" value="0">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Zoom / Scale -->
+            <div class="control-group">
+                <h3>Vue</h3>
+                <div class="input-grid">
+                    <div style="grid-column: span 2;">
+                        <label for="scale">Échelle (px/cm)</label>
+                        <input type="range" id="scale" min="0.5" max="10" value="3" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Real-time Stats -->
+            <div class="stats-panel">
+                <h3>📊 Résultats</h3>
+                <div class="stat-row">
+                    <span>Surface pièce:</span>
+                    <strong id="statArea">0.00 m²</strong>
+                </div>
+                <div class="stat-row">
+                    <span>Surface à carreler (avec marges +10%):</span>
+                    <strong id="statAreaMarge">0.00 m²</strong>
+                </div>
+                <div class="stat-row">
+                    <span>Carreaux pleins:</span>
+                    <strong id="statFullTiles">0</strong>
+                </div>
+                <div class="stat-row">
+                    <span>Carreaux coupés:</span>
+                    <strong id="statCutTiles">0</strong>
+                </div>
+                <div class="stat-row total">
+                    <span>Total carreaux requis:</span>
+                    <strong id="statTotalTiles">0</strong>
+                </div>
+            </div>
+
+            <div class="pro-tip">
+                <p><strong>Astuce:</strong> Maintenez <code>Maj</code> en dessinant pour forcer des angles droits (90°).
+                </p>
+            </div>
+        </aside>
+
+        <!-- Main Canvas Area -->
+        <main class="canvas-container" id="canvasContainer">
+            <canvas id="appCanvas"></canvas>
+			
+			<div class="canvas-nav">
+				<div class="nav-group">
+					<button id="btnZoomIn" title="Zoomer">+</button>
+					<button id="btnZoomOut" title="Dézoomer">-</button>
+				</div>
+				<div class="nav-group d-pad">
+					<button id="btnPanUp" title="Haut">↑</button>
+					<div class="d-pad-mid">
+						<button id="btnPanLeft" title="Gauche">←</button>
+						<button id="btnCenter" title="Centrer">◎</button>
+						<button id="btnPanRight" title="Droite">→</button>
+					</div>
+					<button id="btnPanDown" title="Bas">↓</button>
+				</div>
+			</div>
+            <!-- Instructions overlay when empty -->
+            <div class="instructions" id="instructions">
+                <h3>Commencez par dessiner votre pièce</h3>
+                <p>Cliquez sur l'espace de travail pour placer le premier coin de votre mur.</p>
+                <p>Fermez la forme en cliquant sur le point de départ pour générer le calepinage.</p>
+            </div>
+        </main>
+    </div>
+
+    <!-- Script loading -->
+    <script src="app.js"></script>
+</body>
+
+</html>

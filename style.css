@@ -1,0 +1,270 @@
+:root {
+    --bg-main: #f0f2f5;
+    --sidebar-bg: rgba(255, 255, 255, 0.95);
+    --text-main: #2c3e50;
+    --text-muted: #7f8c8d;
+    --primary: #3498db;
+    --primary-hover: #2980b9;
+    --danger: #e74c3c;
+    --danger-hover: #c0392b;
+    --accent: #2ecc71;
+    --border: #e0e6ed;
+    --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Outfit', sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    overflow: hidden; /* Prevent scrolling, app is full screen */
+    height: 100vh;
+    display: flex;
+}
+
+/* Layout */
+.app-container {
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 350px;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(10px);
+    border-right: 1px solid var(--border);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    box-shadow: 2px 0 15px rgba(0,0,0,0.05);
+    z-index: 10;
+    overflow-y: auto;
+}
+
+.sidebar-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin-bottom: 5px;
+}
+
+.sidebar-header p {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* Controls */
+h3 {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+    font-weight: 600;
+    color: var(--text-main);
+    border-bottom: 2px solid var(--border);
+    padding-bottom: 5px;
+}
+
+.control-group {
+    background: white;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.button-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+button {
+    padding: 10px;
+    border: none;
+    border-radius: 6px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #ecf0f1;
+    color: var(--text-main);
+}
+
+button:hover {
+    background: #bdc3c7;
+}
+
+button.active {
+    background: var(--primary);
+    color: white;
+    box-shadow: 0 4px 10px rgba(52, 152, 219, 0.3);
+}
+
+button.danger {
+    width: 100%;
+    background: #ffeeee;
+    color: var(--danger);
+}
+button.danger:hover {
+    background: var(--danger);
+    color: white;
+}
+
+/* Inputs */
+.input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+label {
+    display: block;
+    font-size: 0.85rem;
+    margin-bottom: 5px;
+    color: var(--text-muted);
+}
+
+input[type="number"], input[type="range"] {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-family: inherit;
+    transition: border-color 0.2s;
+}
+
+input[type="number"]:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Stats panel */
+.stats-panel {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 0.95rem;
+}
+.stat-row:last-child {
+    border-bottom: none;
+}
+
+.stat-row.total {
+    margin-top: 10px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--primary);
+    border-top: 2px solid var(--border);
+    padding-top: 12px;
+    border-bottom: none;
+}
+
+.pro-tip {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background: #eaf2f8;
+    padding: 10px;
+    border-radius: 6px;
+    border-left: 3px solid var(--primary);
+}
+
+/* Canvas Area */
+.canvas-container {
+    flex-grow: 1;
+    position: relative;
+    background: #e5e5f7;
+    background-image:  radial-gradient(#bdc3c7 1px, transparent 1px);
+    background-size: 20px 20px;
+    cursor: crosshair;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* Cursor changes managed by JS based on mode */
+}
+
+/* Overlay Instructions */
+.instructions {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    text-align: center;
+    pointer-events: none; /* Let clicks pass through */
+    transition: opacity 0.3s;
+}
+.instructions h3 {
+    border-bottom: none;
+    font-size: 1.4rem;
+    color: var(--primary);
+}
+.instructions.hidden {
+    opacity: 0;
+}
+/* Navigation flottante sur le Canvas */
+.canvas-nav {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    pointer-events: none; /* Permet de ne pas bloquer les clics si on clique à côté */
+}
+
+.nav-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    pointer-events: auto;
+}
+
+.nav-group button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: white;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    font-size: 1.2rem;
+}
+
+/* Style D-Pad (flèches de direction) */
+.d-pad {
+    align-items: center;
+}
+.d-pad-mid {
+    display: flex;
+    gap: 5px;
+}
+
+#btnCenter {
+    background: var(--primary);
+    color: white;
+}
