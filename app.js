@@ -16,6 +16,8 @@ const inputOffsetY = document.getElementById('offsetY');
 const inputScale = document.getElementById('scale');
 const inputTileShape = document.getElementById('tileShape');
 const inputAngle = document.getElementById('angle');
+const inputStaggerX = document.getElementById('staggerX');
+const inputStaggerY = document.getElementById('staggerY');
 
 const preciseInputGroup = document.getElementById('preciseInputGroup');
 const inputWallLength = document.getElementById('wallLength');
@@ -127,7 +129,7 @@ btnClear.addEventListener('click', () => {
     draw();
 });
 
-[inputTileW, inputTileH, inputJoint, inputOffsetX, inputOffsetY, inputScale, inputTileShape, inputAngle].forEach(el => {
+[inputTileW, inputTileH, inputJoint, inputOffsetX, inputOffsetY, inputScale, inputTileShape, inputAngle, inputStaggerX, inputStaggerY].forEach(el => {
     if (el) el.addEventListener('input', draw);
 });
 
@@ -597,19 +599,47 @@ function draw() {
         // Generator for tiles 
         let localTiles = [];
 
-        if (shape === 'rect') {
-            const startX = Math.floor((minX - offsetX_px) / stepX) * stepX + offsetX_px;
-            const startY = Math.floor((minY - offsetY_px) / stepY) * stepY + offsetY_px;
-            for (let x = startX; x <= maxX; x += stepX) {
-                for (let y = startY; y <= maxY; y += stepY) {
-                    localTiles.push({
-                        type: 'main', poly: [
-                            { x, y }, { x: x + tileW_px, y }, { x: x + tileW_px, y: y + tileH_px }, { x, y: y + tileH_px }
-                        ]
-                    });
-                }
-            }
-        } else if (shape === 'hexa') {
+		if (shape === 'rect') {
+					const staggerX = parseFloat(inputStaggerX?.value || 0) / 100; // conversion % en ratio
+					const staggerY = parseFloat(inputStaggerY?.value || 0) / 100;
+
+					// Calcul du nombre de rangées et colonnes nécessaires pour couvrir la zone
+					const startCol = Math.floor((minX - offsetX_px) / stepX) - 1;
+					const endCol = Math.ceil((maxX - offsetX_px) / stepX) + 1;
+					const startRow = Math.floor((minY - offsetY_px) / stepY) - 1;
+					const endRow = Math.ceil((maxY - offsetY_px) / stepY) + 1;
+
+					for (let iy = startRow; iy <= endRow; iy++) {
+						for (let ix = startCol; ix <= endCol; ix++) {
+							let tx = ix * stepX + offsetX_px;
+							let ty = iy * stepY + offsetY_px;
+
+							// Application du décalage
+							if (staggerX > 0) {
+								// On décale horizontalement une rangée sur deux
+								if (Math.abs(iy) % 2 === 1) {
+									tx += (tileW_px * staggerX);
+								}
+							} else if (staggerY > 0) {
+								// On décale verticalement une colonne sur deux
+								if (Math.abs(ix) % 2 === 1) {
+									ty += (tileH_px * staggerY);
+								}
+							}
+
+							localTiles.push({
+								type: 'main', poly: [
+									{ x: tx, y: ty }, 
+									{ x: tx + tileW_px, y: ty }, 
+									{ x: tx + tileW_px, y: ty + tileH_px }, 
+									{ x: tx, y: ty + tileH_px }
+								]
+							});
+						}
+					}
+		}
+		
+		else if (shape === 'hexa') {
             const startRow = Math.floor((minY - offsetY_px) / stepY);
             const endRow = Math.ceil((maxY - offsetY_px) / stepY);
             const startCol = Math.floor((minX - offsetX_px - stepX / 2) / stepX);
