@@ -13,11 +13,13 @@ const inputTileH = document.getElementById('tileH');
 const inputJoint = document.getElementById('joint');
 const inputOffsetX = document.getElementById('offsetX');
 const inputOffsetY = document.getElementById('offsetY');
+const FIXED_PX_PER_CM = 10; // 1cm = 10px (référentiel interne fixe)
 const inputScale = document.getElementById('scale');
 const inputTileShape = document.getElementById('tileShape');
 const inputAngle = document.getElementById('angle');
 const inputStaggerX = document.getElementById('staggerX');
 const inputStaggerY = document.getElementById('staggerY');
+const inputStaggerCycle = document.getElementById('staggerCycle');
 
 const preciseInputGroup = document.getElementById('preciseInputGroup');
 const inputWallLength = document.getElementById('wallLength');
@@ -102,6 +104,7 @@ window.addEventListener('mousemove', (e) => {
     const rawX = e.clientX - rect.left;
     const rawY = e.clientY - rect.top;
     mousePos = screenToWorld(rawX, rawY);
+
 });
 
 window.addEventListener('mouseup', () => {
@@ -129,7 +132,7 @@ btnClear.addEventListener('click', () => {
     draw();
 });
 
-[inputTileW, inputTileH, inputJoint, inputOffsetX, inputOffsetY, inputScale, inputTileShape, inputAngle, inputStaggerX, inputStaggerY].forEach(el => {
+[inputTileW, inputTileH, inputJoint, inputOffsetX, inputOffsetY, inputScale, inputTileShape, inputAngle, inputStaggerX, inputStaggerY, inputStaggerCycle].forEach(el => {
     if (el) el.addEventListener('input', draw);
 });
 
@@ -180,7 +183,7 @@ function applyPreciseWall() {
     const lengthCm = parseFloat(inputWallLength.value);
     if (!lengthCm || lengthCm <= 0) return;
 
-    const pxlScale = parseFloat(inputScale.value) || 3;
+    const pxlScale = FIXED_PX_PER_CM || 3;
     const lengthPx = lengthCm * pxlScale;
 
     const last = points[points.length - 1];
@@ -215,11 +218,22 @@ inputWallLength.addEventListener('keydown', (e) => {
 // Canvas Mouse Events
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
-    mousePos = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-    };
+    const sx = e.clientX - rect.left;
+    const sy = e.clientY - rect.top;
 
+    // 1. IMPORTANT : Convertir la position souris en coordonnées "Monde" (prise en compte du zoom/pan)
+    mousePos = screenToWorld(sx, sy);
+
+    // Gestion du déplacement de la vue (Panoramique) avec clic milieu
+    if (isPanning) {
+        view.x += (e.clientX - lastMousePos.x);
+        view.y += (e.clientY - lastMousePos.y);
+        lastMousePos = { x: e.clientX, y: e.clientY };
+        draw();
+        return;
+    }
+
+    // Contrainte Shift pendant le DESSIN (création de nouveaux points)
     if (e.shiftKey && !isClosed && points.length > 0 && mode === 'DRAW') {
         const last = points[points.length - 1];
         const dx = Math.abs(mousePos.x - last.x);
@@ -228,40 +242,62 @@ canvas.addEventListener('mousemove', (e) => {
         else mousePos.x = last.x;
     }
 
+    // Logique de Dragging
     if (isDraggingGrid && mode === 'EDIT') {
-        const pxlScale = parseFloat(inputScale.value);
+        const pxlScale = FIXED_PX_PER_CM;
         const dx = (mousePos.x - dragStart.x) / pxlScale;
         const dy = (mousePos.y - dragStart.y) / pxlScale;
         inputOffsetX.value = Math.round(initialOffset.x + dx);
         inputOffsetY.value = Math.round(initialOffset.y + dy);
         draw();
-    } else if (isDraggingPoint !== null) {
-        if (e.shiftKey && points.length > 2) {
-            // Pseudo-orthogonal snapping for dragging a point could go here
-            // But keep it simple for now
-        }
-        points[isDraggingPoint].x = mousePos.x;
-        points[isDraggingPoint].y = mousePos.y;
-        draw();
-    } else {
-        // check hover over points
+    } 
+	else if (isDraggingPoint !== null) {
+		const p = mousePos;
+		// Récupérer les voisins
+		const prev = points[(isDraggingPoint + points.length - 1) % points.length];
+		const next = points[(isDraggingPoint + 1) % points.length];
+
+		if (e.shiftKey) {
+			let snapX = p.x;
+			let snapY = p.y;
+
+			// Seuil de magnétisme (ajusté au zoom pour rester constant à l'écran)
+			const threshold = 15 / view.zoom;
+
+			// Alignement X (Vertical) : on s'aligne si on est proche du X de l'un des voisins
+			if (Math.abs(p.x - prev.x) < threshold) snapX = prev.x;
+			else if (Math.abs(p.x - next.x) < threshold) snapX = next.x;
+
+			// Alignement Y (Horizontal) : on s'aligne si on est proche du Y de l'un des voisins
+			if (Math.abs(p.y - prev.y) < threshold) snapY = prev.y;
+			else if (Math.abs(p.y - next.y) < threshold) snapY = next.y;
+
+			points[isDraggingPoint].x = snapX;
+			points[isDraggingPoint].y = snapY;
+		} else {
+			points[isDraggingPoint].x = p.x;
+			points[isDraggingPoint].y = p.y;
+		}
+		draw();
+	}
+    else {
+        // Gestion du curseur et prévisualisation
         let hoveringPoint = false;
         if (isClosed) {
             for (let i = 0; i < points.length; i++) {
-                if (Math.hypot(points[i].x - mousePos.x, points[i].y - mousePos.y) < POINT_RADIUS * 2) {
+                // Ajuster la zone de détection au zoom
+                if (Math.hypot(points[i].x - mousePos.x, points[i].y - mousePos.y) < (POINT_RADIUS * 2) / view.zoom) {
                     hoveringPoint = true;
                     break;
                 }
             }
         }
-        if (hoveringPoint) {
-            canvas.style.cursor = 'move';
-        } else {
-            canvas.style.cursor = mode === 'DRAW' ? 'crosshair' : (isDraggingGrid ? 'grabbing' : 'grab');
-        }
+        
+        canvas.style.cursor = hoveringPoint ? 'move' : (mode === 'DRAW' ? 'crosshair' : 'grab');
 
+        // Redessiner pour la ligne de prévisualisation en mode dessin
         if (!isClosed && mode === 'DRAW') {
-            draw(); // draw preview line
+            draw();
         }
     }
 });
@@ -350,6 +386,54 @@ canvas.addEventListener('mouseleave', () => {
     isDraggingPoint = null;
     canvas.style.cursor = mode === 'DRAW' ? 'crosshair' : 'grab';
     draw();
+});
+canvas.addEventListener('dblclick', (e) => {
+    const worldP = mousePos; // Déjà converti via screenToWorld dans mousemove
+
+    // 1. Double-clic sur un point existant -> Suppression
+    for (let i = 0; i < points.length; i++) {
+        if (Math.hypot(points[i].x - worldP.x, points[i].y - worldP.y) < POINT_RADIUS * 2) {
+            points.splice(i, 1);
+            if (points.length < 3) isClosed = false;
+            draw();
+            return;
+        }
+    }
+
+    // 2. Double-clic sur une ligne -> Ajouter point OU modifier longueur
+    if (isClosed) {
+        for (let i = 0; i < points.length; i++) {
+            const p1 = points[i];
+            const p2 = points[(i + 1) % points.length];
+            
+            if (getDistToSegment(worldP, p1, p2) < 10) {
+                const action = confirm("Voulez-vous modifier la longueur de ce mur ?\n(Annuler pour simplement ajouter un point)");
+                
+                if (action) {
+                    const currentLen = Math.hypot(p2.x - p1.x, p2.y - p1.y) / FIXED_PX_PER_CM;
+                    const newLen = prompt("Nouvelle longueur (cm) :", Math.round(currentLen));
+                    
+                    if (newLen && !isNaN(newLen)) {
+                        const ratio = (parseFloat(newLen) * FIXED_PX_PER_CM) / Math.hypot(p2.x - p1.x, p2.y - p1.y);
+                        const dx = (p2.x - p1.x) * (ratio - 1);
+                        const dy = (p2.y - p1.y) * (ratio - 1);
+                        
+                        // On déplace P2 et tous les points suivants pour conserver la forme
+                        for (let j = (i + 1) % points.length; j < points.length; j++) {
+                            points[j].x += dx;
+                            points[j].y += dy;
+                            if (j === 0 && isClosed) break; // Sécurité polygone
+                        }
+                    }
+                } else {
+                    // Ajouter un point à l'endroit du clic
+                    points.splice(i + 1, 0, { x: worldP.x, y: worldP.y });
+                }
+                draw();
+                return;
+            }
+        }
+    }
 });
 
 // Math Helpers
@@ -449,7 +533,7 @@ function draw() {
     // Grid Background
     const drawGrid = false; // Using CSS grid instead for the background
 
-    const pxlScale = parseFloat(inputScale.value) || 3;
+    const pxlScale = FIXED_PX_PER_CM || 3;
     const tW = parseFloat(inputTileW.value) || 60;
     let tH = parseFloat(inputTileH.value) || 60;
     const joint = (parseFloat(inputJoint.value) || 3) / 10; // mm to cm
@@ -479,13 +563,13 @@ function draw() {
         }
 
         ctx.strokeStyle = "#2c3e50";
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 / view.zoom;;
         ctx.stroke();
 
         if (!isClosed && mode === 'DRAW') {
             ctx.lineTo(mousePos.x, mousePos.y);
             ctx.strokeStyle = "rgba(44, 62, 80, 0.5)";
-            ctx.setLineDash([5, 5]);
+            ctx.setLineDash([5 / view.zoom, 5 / view.zoom]); // Dash divisé
             ctx.stroke();
             ctx.setLineDash([]);
 
@@ -506,17 +590,17 @@ function draw() {
         // Draw vertices
         for (let i = 0; i < points.length; i++) {
             ctx.beginPath();
-            ctx.arc(points[i].x, points[i].y, POINT_RADIUS, 0, Math.PI * 2);
+            ctx.arc(points[i].x, points[i].y, POINT_RADIUS / view.zoom, 0, Math.PI * 2);
             ctx.fillStyle = (i === 0 && !isClosed) ? "#e74c3c" : "#3498db";
             ctx.fill();
             ctx.strokeStyle = "#fff";
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 2 / view.zoom;
             ctx.stroke();
         }
 
         // Draw wall dimensions
         ctx.fillStyle = "#2c3e50";
-        ctx.font = "bold 13px 'Outfit', sans-serif";
+        ctx.font = `bold ${13 / view.zoom}px 'Outfit', sans-serif`; // Taille police divisée
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
@@ -532,8 +616,8 @@ function draw() {
             const my = (p1.y + p2.y) / 2;
 
             const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-            const offX = Math.cos(angle - Math.PI / 2) * 20;
-            const offY = Math.sin(angle - Math.PI / 2) * 20;
+            const offX = Math.cos(angle - Math.PI / 2) * (20 / view.zoom);
+            const offY = Math.sin(angle - Math.PI / 2) * (20 / view.zoom);
 
             ctx.save();
             ctx.translate(mx + offX, my + offY);
@@ -546,7 +630,7 @@ function draw() {
             const txt = `${Math.round(distCm)} cm`;
             const tw = ctx.measureText(txt).width;
             ctx.fillStyle = "rgba(255,255,255,0.85)";
-            ctx.fillRect(-tw / 2 - 4, -10, tw + 8, 20);
+            ctx.fillRect(-tw / 2 - 4 / view.zoom, -10 / view.zoom, tw + 8 / view.zoom, 20 / view.zoom);
 
             ctx.fillStyle = "#2c3e50";
             ctx.fillText(txt, 0, 0);
@@ -600,43 +684,45 @@ function draw() {
         let localTiles = [];
 
 		if (shape === 'rect') {
-					const staggerX = parseFloat(inputStaggerX?.value || 0) / 100; // conversion % en ratio
-					const staggerY = parseFloat(inputStaggerY?.value || 0) / 100;
+			const staggerX = parseFloat(inputStaggerX?.value || 0) / 100;
+			const staggerY = parseFloat(inputStaggerY?.value || 0) / 100;
+			const cycle = parseInt(inputStaggerCycle?.value || 2); // Nombre de lignes du cycle
 
-					// Calcul du nombre de rangées et colonnes nécessaires pour couvrir la zone
-					const startCol = Math.floor((minX - offsetX_px) / stepX) - 1;
-					const endCol = Math.ceil((maxX - offsetX_px) / stepX) + 1;
-					const startRow = Math.floor((minY - offsetY_px) / stepY) - 1;
-					const endRow = Math.ceil((maxY - offsetY_px) / stepY) + 1;
+			const startCol = Math.floor((minX - offsetX_px) / stepX) - cycle;
+			const endCol = Math.ceil((maxX - offsetX_px) / stepX) + cycle;
+			const startRow = Math.floor((minY - offsetY_px) / stepY) - cycle;
+			const endRow = Math.ceil((maxY - offsetY_px) / stepY) + cycle;
 
-					for (let iy = startRow; iy <= endRow; iy++) {
-						for (let ix = startCol; ix <= endCol; ix++) {
-							let tx = ix * stepX + offsetX_px;
-							let ty = iy * stepY + offsetY_px;
+			for (let iy = startRow; iy <= endRow; iy++) {
+				for (let ix = startCol; ix <= endCol; ix++) {
+					let tx = ix * stepX + offsetX_px;
+					let ty = iy * stepY + offsetY_px;
 
-							// Application du décalage
-							if (staggerX > 0) {
-								// On décale horizontalement une rangée sur deux
-								if (Math.abs(iy) % 2 === 1) {
-									tx += (tileW_px * staggerX);
-								}
-							} else if (staggerY > 0) {
-								// On décale verticalement une colonne sur deux
-								if (Math.abs(ix) % 2 === 1) {
-									ty += (tileH_px * staggerY);
-								}
-							}
+					// Calcul de la position dans le cycle (0, 1, 2... cycle-1)
+					// On utilise un modulo robuste pour les nombres négatifs
+					const cycleIndexX = ((iy % cycle) + cycle) % cycle;
+					const cycleIndexY = ((ix % cycle) + cycle) % cycle;
 
-							localTiles.push({
-								type: 'main', poly: [
-									{ x: tx, y: ty }, 
-									{ x: tx + tileW_px, y: ty }, 
-									{ x: tx + tileW_px, y: ty + tileH_px }, 
-									{ x: tx, y: ty + tileH_px }
-								]
-							});
-						}
+					// Application du décalage progressif
+					if (staggerX > 0) {
+						// Chaque ligne du cycle ajoute une fraction de décalage supplémentaire
+						tx += (tileW_px * staggerX) * cycleIndexX;
+					} 
+					else if (staggerY > 0) {
+						// Chaque colonne du cycle ajoute une fraction de décalage supplémentaire
+						ty += (tileH_px * staggerY) * cycleIndexY;
 					}
+
+					localTiles.push({
+						type: 'main', poly: [
+							{ x: tx, y: ty }, 
+							{ x: tx + tileW_px, y: ty }, 
+							{ x: tx + tileW_px, y: ty + tileH_px }, 
+							{ x: tx, y: ty + tileH_px }
+						]
+					});
+				}
+			}
 		}
 		
 		else if (shape === 'hexa') {
@@ -856,6 +942,14 @@ function draw() {
         statTotalTiles.innerText = "0";
     }
 	ctx.restore();
+}
+// Calcule la distance entre un point P et un segment [A, B]
+function getDistToSegment(p, a, b) {
+    let l2 = Math.hypot(a.x - b.x, a.y - b.y)**2;
+    if (l2 === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+    let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p.x - (a.x + t * (b.x - a.x)), p.y - (a.y + t * (b.y - a.y)));
 }
 
 // Init
