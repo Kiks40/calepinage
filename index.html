@@ -86,6 +86,10 @@
 						<label title="Décalage vertical d'une colonne sur deux">Pose Décalée Y (%)</label>
 						<input type="number" id="staggerY" value="0" min="0" max="100" step="10">
 					</div>
+					<div>
+						<label title="Nombre de lignes avant de revenir au décalage initial">Cycle du motif</label>
+						<input type="number" id="staggerCycle" value="2" min="2" step="1">
+					</div>
                 </div>
             </div>
 
@@ -93,24 +97,13 @@
             <div class="control-group">
                 <h3>Décalage départ (cm)</h3>
                 <div class="input-grid">
-                    <div>
+					<div>
                         <label for="offsetX">Axe X</label>
                         <input type="number" id="offsetX" value="0">
                     </div>
                     <div>
                         <label for="offsetY">Axe Y</label>
                         <input type="number" id="offsetY" value="0">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Zoom / Scale -->
-            <div class="control-group">
-                <h3>Vue</h3>
-                <div class="input-grid">
-                    <div style="grid-column: span 2;">
-                        <label for="scale">Échelle (px/cm)</label>
-                        <input type="range" id="scale" min="0.5" max="10" value="3" step="0.1">
                     </div>
                 </div>
             </div>
